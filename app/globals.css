@@ -2,19 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+    /* Font stacks (design-system §2). Exposed as --font-sans / --font-mono so
+       the `font-sans` / `font-mono` Tailwind utilities resolve to a premium,
+       zero-network system stack — no external font fetch, so no font-swap CLS. */
+    --font-sans:
+      ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji";
+    --font-mono:
+      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      "Liberation Mono", monospace;
 
-body {
-  color: var(--foreground);
-  background: var(--background);
+    /* Surface role variables (design-system §12/§13) — flip together on `.dark`. */
+    --bg: 255 255 255;
+    --bg-subtle: 248 250 252;
+    --surface: 255 255 255;
+    --border: 226 232 240;
+    --text: 15 23 42;
+    --text-muted: 71 85 105;
+    --link: 79 70 229;
+    --ring: 79 70 229;
+  }
+
+  .dark {
+    --bg: 2 6 23;
+    --bg-subtle: 11 17 32;
+    --surface: 15 23 42;
+    --border: 30 41 59;
+    --text: 241 245 249;
+    --text-muted: 148 163 184;
+    --link: 129 140 248;
+    --ring: 129 140 248;
+  }
+
+  body {
+    background: rgb(var(--bg));
+    color: rgb(var(--text));
+  }
+
+  /* Smooth anchor scrolling for the in-page nav, disabled under reduced motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  /* Offset in-page anchor targets so sticky-nav (h-16) doesn't cover headings. */
+  :target {
+    scroll-margin-top: 5rem;
+  }
 }
