@@ -4,7 +4,7 @@ import { siteConfig } from "@/lib/site";
 /**
  * Web app manifest (/manifest.webmanifest). Gives the site an installable
  * identity and lets Lighthouse/browsers pick up name, colors, and icon.
- * The icon is the build-generated `app/icon` route (see app/icon.tsx).
+ * The icon is the static asset public/icon.png.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -17,7 +17,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#4f46e5",
     icons: [
       {
-        src: "/icon",
+        src: "/icon.png",
         sizes: "32x32",
         type: "image/png",
       },

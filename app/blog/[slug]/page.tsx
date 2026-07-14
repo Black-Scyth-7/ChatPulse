@@ -54,7 +54,7 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
     publisher: {
       "@type": "Organization",
       name: siteConfig.name,
-      logo: { "@type": "ImageObject", url: absoluteUrl("/icon") },
+      logo: { "@type": "ImageObject", url: absoluteUrl("/icon.png") },
     },
     mainEntityOfPage: {
       "@type": "WebPage",

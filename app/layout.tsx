@@ -14,6 +14,11 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  // Brand icon + social card are pre-rendered static assets in public/ (see
+  // that dir). They were previously generated on the fly via next/og edge
+  // routes, but that emits a build warning and can't be prerendered on the Node
+  // runtime; static assets keep the build clean and are served straight from CDN.
+  icons: { icon: "/icon.png" },
   openGraph: {
     type: "website",
     url: siteConfig.url,
@@ -21,6 +26,9 @@ export const metadata: Metadata = {
     locale: siteConfig.locale,
     title: siteConfig.tagline,
     description: siteConfig.ogDescription,
+    images: [
+      { url: "/opengraph-image.png", width: 1200, height: 630, alt: siteConfig.tagline },
+    ],
   },
   twitter: {
     card: "summary_large_image",
@@ -28,6 +36,7 @@ export const metadata: Metadata = {
     creator: siteConfig.twitter,
     title: siteConfig.tagline,
     description: siteConfig.ogDescription,
+    images: ["/opengraph-image.png"],
   },
   robots: {
     index: true,
@@ -62,7 +71,7 @@ const organizationSchema = {
   name: siteConfig.name,
   url: siteConfig.url,
   description: siteConfig.description,
-  logo: absoluteUrl("/icon"),
+  logo: absoluteUrl("/icon.png"),
 };
 
 const websiteSchema = {
