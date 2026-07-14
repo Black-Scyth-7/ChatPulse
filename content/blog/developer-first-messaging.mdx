@@ -1,0 +1,80 @@
+---
+title: "Developer-First Messaging: An API, Not an Afterthought"
+description: "Most chat tools bolt on an API after the fact. ChatPulse is built API-first — a clean REST surface, real webhooks, and a CLI, so your team can automate the conversation."
+date: "2026-07-16"
+author: "The ChatPulse Team"
+---
+
+If your team writes software, your chat tool is part of your infrastructure
+whether it wants to be or not. Deploys announce themselves in a channel.
+Alerts page someone. A bot files the incident. The question is whether that
+automation feels like a first-class feature or a fragile workaround.
+
+We built ChatPulse API-first, which means the integration surface isn't a
+bolt-on — it's the same interface our own product is built on.
+
+## What "API-first" actually buys you
+
+A clean REST API with predictable resources. Sending a message is a `POST`,
+not a scraped webhook payload reverse-engineered from a screenshot:
+
+```bash
+curl -X POST https://api.chatpulse.dev/v1/messages \
+  -H "Authorization: Bearer $CHATPULSE_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "channel": "deploys",
+    "text": "Shipped v2.4.0 to production :rocket:"
+  }'
+```
+
+Every action a person can take in the UI, an integration can take through the
+API. No feature is quietly UI-only.
+
+## Webhooks that tell you what changed
+
+Polling is a tax on everyone. ChatPulse pushes events to your endpoint the
+moment they happen — a new message, a reaction, a member joining a channel —
+each one signed so you can verify it came from us:
+
+```json
+{
+  "type": "message.created",
+  "channel": "incidents",
+  "message": {
+    "id": "msg_8f2c",
+    "author": "ada",
+    "text": "Rolling back, api p99 spiked"
+  }
+}
+```
+
+Point it at your incident tooling, your data warehouse, or a Lambda that
+decides whether to wake someone up. It's your event, do what you like with it.
+
+## A CLI, because the terminal is home
+
+For a lot of us, the fastest path to anything is a shell. So there's a CLI:
+
+```bash
+chatpulse send deploys "Migration 0042 applied, no downtime"
+chatpulse tail incidents --follow
+```
+
+Pipe log output into a channel. Tail a channel into `grep`. Wire it into a
+Makefile. The CLI is a thin, scriptable layer over the same API, which means
+anything it does, your automation can do too.
+
+## Built on the same primitives you get
+
+Here's the part we care about most: we didn't build a private API for
+ourselves and a limited one for you. ChatPulse's own clients talk to the same
+documented endpoints, rate limits, and event streams that your integrations
+use. When we improve the platform, you get the improvement — not a changelog
+note about a feature you can't reach.
+
+Developer-first isn't a marketing line for us. It's a constraint we accepted
+on day one, and it shows up in every part of the product.
+
+Want early access to the API and CLI? [Join the waitlist](/#waitlist) — we're
+bringing developers in first.
