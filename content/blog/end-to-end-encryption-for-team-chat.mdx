@@ -1,0 +1,68 @@
+---
+title: "End-to-End Encryption for Team Chat, Explained"
+description: "What end-to-end encryption actually means for team messaging, why it's harder than 1:1 chat, and how ChatPulse keeps your conversations readable only by your team."
+date: "2026-07-15"
+author: "The ChatPulse Team"
+---
+
+"End-to-end encrypted" gets printed on a lot of landing pages. It's worth
+knowing what it actually promises — and what it doesn't — before you trust a
+tool with your team's conversations.
+
+## What end-to-end encryption means
+
+Encryption in transit (TLS) protects your messages while they travel between
+your device and a server. That's table stakes, and almost everyone has it. But
+it means the server still sees your messages in plaintext when they arrive.
+
+**End-to-end encryption (E2EE)** goes further: messages are encrypted on the
+sender's device and can only be decrypted by the intended recipients. The
+server relays ciphertext it cannot read. If our database were compromised
+tomorrow, an attacker would find encrypted blobs, not your conversations.
+
+The short version: with E2EE, the content of your messages is readable by your
+team and no one else — not even us.
+
+## Why team chat is harder than 1:1
+
+Encrypting a conversation between two people is a well-understood problem.
+Team chat breaks several of its assumptions:
+
+- **Many participants.** A channel isn't two devices; it's dozens, each with
+  their own keys, joining and leaving over time.
+- **Membership changes.** When someone joins a channel, what can they read?
+  When they leave, what should they lose access to going forward?
+- **Multiple devices.** People read on a laptop, a phone, and a new laptop six
+  months later. Keys have to move safely without ever exposing plaintext to
+  the server.
+
+The answer to "many participants who come and go" is a technique called a
+**group ratchet** — the approach standardized in
+[MLS (Messaging Layer Security)](https://messaginglayersecurity.rocks/). Each
+channel maintains a shared group key that advances forward every time
+membership changes, so a new member can't read history from before they
+joined, and a departing member can't read messages sent after they left.
+
+## The honest trade-offs
+
+E2EE isn't free, and we'd rather tell you the costs than hide them:
+
+- **Server-side search is limited.** We can't index what we can't read.
+  ChatPulse does search on the client, over the messages your device has
+  already decrypted.
+- **Key loss is real.** If every device holding a channel's keys is lost, that
+  history is gone. We mitigate this with encrypted key backup you control, but
+  the math is unforgiving by design — that's the point.
+- **Some integrations need to opt in.** A bot that summarizes a channel has to
+  be an explicit member with its own keys, not a silent reader.
+
+## Our commitment
+
+We think privacy shouldn't be a premium tier or a checkbox in an enterprise
+plan. E2EE is on by default for every team on ChatPulse, and we'll keep
+publishing the details of how it works — because "trust us" is exactly the
+thing end-to-end encryption is designed to make unnecessary.
+
+Curious about the deeper architecture? We'll be writing about our key handling
+and MLS implementation in future posts. [Join the waitlist](/#waitlist) to
+follow along.

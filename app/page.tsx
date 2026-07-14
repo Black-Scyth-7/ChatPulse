@@ -1,20 +1,23 @@
-import Link from "next/link";
+import { CTA } from "@/components/landing/CTA";
+import { Features } from "@/components/landing/Features";
+import { Footer } from "@/components/landing/Footer";
+import { Hero } from "@/components/landing/Hero";
+import { Nav } from "@/components/landing/Nav";
+import { Security } from "@/components/landing/Security";
+import { SocialProof } from "@/components/landing/SocialProof";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-6 px-6 text-center">
-      <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-        ChatPulse
-      </h1>
-      <p className="max-w-xl text-lg text-gray-600 dark:text-gray-300">
-        Real-time conversation insights. The project scaffold is up and running.
-      </p>
-      <Link
-        href="/blog"
-        className="rounded-full bg-gray-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
-      >
-        Read the blog
-      </Link>
-    </main>
+    <>
+      <Nav />
+      <main id="main">
+        <Hero />
+        <Features />
+        <SocialProof />
+        <Security />
+        <CTA />
+      </main>
+      <Footer />
+    </>
   );
 }

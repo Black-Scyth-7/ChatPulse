@@ -7,6 +7,9 @@
 # testing
 /coverage
 
+# waitlist local persistence (JSONL signup store)
+/.data
+
 # next.js
 /.next/
 /out/
