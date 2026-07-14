@@ -19,7 +19,7 @@ export function Footer() {
           {/* Link columns */}
           {FOOTER.columns.map((column) => (
             <nav key={column.header} aria-label={column.header}>
-              <h2 className="text-caption font-semibold uppercase tracking-wide text-ink-400">
+              <h2 className="text-caption font-semibold uppercase tracking-wide text-ink-600 dark:text-ink-400">
                 {column.header}
               </h2>
               <ul className="mt-3 space-y-2">

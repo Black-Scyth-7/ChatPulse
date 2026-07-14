@@ -43,11 +43,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#020617" },
-  ],
-  colorScheme: "light dark",
+  themeColor: "#4f46e5",
+  // The site renders light-only at runtime (Tailwind `dark:` variants exist but
+  // nothing toggles the `.dark` class yet). Declaring `light` keeps user-agent
+  // dark-mode heuristics (auto-dark, dark default link colors) from recoloring
+  // the page. Revisit to `light dark` when a real theme toggle ships.
+  colorScheme: "light",
 };
 
 /**
