@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { WAITLIST_COPY } from "./content";
 import { SpinnerIcon } from "./icons";
 
@@ -33,8 +33,18 @@ export function WaitlistForm({
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
 
+  const inputRef = useRef<HTMLInputElement>(null);
+  const successRef = useRef<HTMLParagraphElement>(null);
+
   const inverted = variant === "inverted";
   const submitting = status === "submitting";
+
+  // On success the form is replaced by the confirmation, so keyboard focus
+  // would otherwise fall back to <body>. Move it to the confirmation (which is
+  // also a live region) so screen-reader and keyboard users land on the result.
+  useEffect(() => {
+    if (status === "success") successRef.current?.focus();
+  }, [status]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,6 +54,8 @@ export function WaitlistForm({
     if (!EMAIL_RE.test(value)) {
       setStatus("error");
       setError(WAITLIST_COPY.errorInvalid);
+      // Return focus to the field so the user can immediately correct it.
+      inputRef.current?.focus();
       return;
     }
 
@@ -81,11 +93,13 @@ export function WaitlistForm({
   if (status === "success") {
     return (
       <p
+        ref={successRef}
         role="status"
+        tabIndex={-1}
         className={
           inverted
-            ? "rounded-md bg-white/95 px-4 py-3 text-small font-medium text-success-fg"
-            : "rounded-md bg-success-soft px-4 py-3 text-small font-medium text-success-fg"
+            ? "rounded-md bg-white/95 px-4 py-3 text-small font-medium text-success-fg focus:outline-none"
+            : "rounded-md bg-success-soft px-4 py-3 text-small font-medium text-success-fg focus:outline-none"
         }
       >
         {WAITLIST_COPY.success}
@@ -110,6 +124,7 @@ export function WaitlistForm({
           {WAITLIST_COPY.emailLabel}
         </label>
         <input
+          ref={inputRef}
           id={fieldId}
           type="email"
           name="email"
@@ -136,6 +151,9 @@ export function WaitlistForm({
       </div>
       <p
         id={msgId}
+        // Announce validation/API errors to assistive tech the moment they
+        // appear. The node persists (helper ⇄ error) so the role swap is read.
+        role={hasError ? "alert" : undefined}
         className={
           hasError
             ? "mt-3 flex items-center gap-1.5 text-small font-medium text-danger"
