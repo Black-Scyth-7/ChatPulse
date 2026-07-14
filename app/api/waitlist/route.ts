@@ -1,35 +1,45 @@
 import { NextResponse } from "next/server";
+import {
+  getWaitlistStore,
+  notifyIntegration,
+  submitToWaitlist,
+} from "@/lib/waitlist";
 
 /**
- * Minimal waitlist submit endpoint. Persistence is a separate ticket (see
- * docs/landing-sections.md §7) — this validates the email and acknowledges so
- * the landing form is fully functional (loading → success/error) in preview.
+ * Waitlist signup endpoint. Validates the email, dedupes, and persists via the
+ * configured store (append-only JSONL by default — see
+ * docs/waitlist-integration.md). All domain logic lives in lib/waitlist.ts and
+ * is unit-tested; this handler only adapts HTTP ⇄ domain.
  *
- * In-memory Set only dedupes within a single server instance; it is not durable
- * storage and resets on redeploy. Good enough to exercise the 409 path.
+ * Responses (contract consumed by components/landing/WaitlistForm.tsx):
+ *   200 { ok: true }           — joined
+ *   400 { error: "invalid_body" | "invalid_email" }
+ *   409 { error: "already_joined" }
+ *   500 { error: "storage_error" }
  */
-const seen = new Set<string>();
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const runtime = "nodejs"; // FileWaitlistStore uses node:fs.
 
 export async function POST(request: Request) {
-  let email: unknown;
+  let body: unknown;
   try {
-    const body = await request.json();
-    email = body?.email;
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
-  if (typeof email !== "string" || !EMAIL_RE.test(email.trim())) {
-    return NextResponse.json({ error: "invalid_email" }, { status: 400 });
+  const email = (body as { email?: unknown } | null)?.email;
+  const source = (body as { source?: unknown } | null)?.source;
+
+  const result = await submitToWaitlist(email, getWaitlistStore(), {
+    source: typeof source === "string" ? source : undefined,
+  });
+
+  if (result.ok) {
+    // Fire-and-forget: the record is already persisted; don't block the
+    // response on an optional downstream integration.
+    void notifyIntegration(result.record);
+    return NextResponse.json({ ok: true }, { status: 200 });
   }
 
-  const normalized = email.trim().toLowerCase();
-  if (seen.has(normalized)) {
-    return NextResponse.json({ error: "already_joined" }, { status: 409 });
-  }
-  seen.add(normalized);
-
-  return NextResponse.json({ ok: true }, { status: 200 });
+  return NextResponse.json({ error: result.code }, { status: result.status });
 }
