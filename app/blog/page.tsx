@@ -1,10 +1,20 @@
 import Link from "next/link";
 import { formatDate, getAllPosts } from "@/lib/posts";
 
-export const metadata = {
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
   title: "Blog",
   description:
     "Product updates, engineering notes, and thinking behind ChatPulse.",
+  alternates: { canonical: "/blog" },
+  openGraph: {
+    type: "website",
+    url: "/blog",
+    title: "Blog — ChatPulse",
+    description:
+      "Product updates, engineering notes, and thinking behind ChatPulse.",
+  },
 };
 
 export default function BlogIndex() {

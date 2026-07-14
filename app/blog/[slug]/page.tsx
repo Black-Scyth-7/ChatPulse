@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import { JsonLd } from "@/components/JsonLd";
 import { formatDate, getPostBySlug, getPostSlugs } from "@/lib/posts";
+import { absoluteUrl, siteConfig } from "@/lib/site";
 
 export function generateStaticParams() {
   return getPostSlugs().map((slug) => ({ slug }));
@@ -15,15 +17,23 @@ export function generateMetadata({
 }): Metadata {
   const post = getPostBySlug(params.slug);
   if (!post) return { title: "Post not found" };
+  const canonical = `/blog/${post.slug}`;
   return {
     title: post.title,
     description: post.description,
+    alternates: { canonical },
     openGraph: {
       type: "article",
+      url: absoluteUrl(canonical),
       title: post.title,
       description: post.description,
       ...(post.date ? { publishedTime: post.date } : {}),
       ...(post.author ? { authors: [post.author] } : {}),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: post.description,
     },
   };
 }
@@ -32,8 +42,29 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
   const post = getPostBySlug(params.slug);
   if (!post) notFound();
 
+  const articleSchema = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    ...(post.description ? { description: post.description } : {}),
+    ...(post.date ? { datePublished: post.date, dateModified: post.date } : {}),
+    ...(post.author
+      ? { author: { "@type": "Person", name: post.author } }
+      : {}),
+    publisher: {
+      "@type": "Organization",
+      name: siteConfig.name,
+      logo: { "@type": "ImageObject", url: absoluteUrl("/icon") },
+    },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": absoluteUrl(`/blog/${post.slug}`),
+    },
+  };
+
   return (
     <>
+      <JsonLd data={articleSchema} />
       <header className="border-b border-ink-200 dark:border-ink-800">
         <div className="mx-auto flex h-16 max-w-content items-center px-6">
           <Link

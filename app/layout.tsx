@@ -1,30 +1,75 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { JsonLd } from "@/components/JsonLd";
+import { absoluteUrl, siteConfig } from "@/lib/site";
 import "./globals.css";
 
-const siteUrl = "https://chatpulse.app";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(siteConfig.url),
   title: {
-    default: "ChatPulse — Secure real-time team chat",
-    template: "%s — ChatPulse",
+    default: siteConfig.title,
+    template: `%s — ${siteConfig.name}`,
   },
-  description:
-    "Secure, real-time team chat for engineering teams. Channels, threads, and instant search — with end-to-end encryption on by default.",
+  description: siteConfig.description,
+  applicationName: siteConfig.name,
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     type: "website",
-    url: siteUrl,
-    siteName: "ChatPulse",
-    title: "Team chat that's fast, searchable, and encrypted end to end.",
-    description:
-      "Real-time messaging, threads, channels, and full-text search — all end-to-end encrypted. Built for how engineering teams actually work.",
+    url: siteConfig.url,
+    siteName: siteConfig.name,
+    locale: siteConfig.locale,
+    title: siteConfig.tagline,
+    description: siteConfig.ogDescription,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Team chat that's fast, searchable, and encrypted end to end.",
-    description:
-      "Real-time messaging, threads, channels, and full-text search — all end-to-end encrypted. Built for how engineering teams actually work.",
+    site: siteConfig.twitter,
+    creator: siteConfig.twitter,
+    title: siteConfig.tagline,
+    description: siteConfig.ogDescription,
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#020617" },
+  ],
+  colorScheme: "light dark",
+};
+
+/**
+ * Site-wide structured data: the Organization (for a knowledge panel /
+ * brand identity) and the WebSite (enables the sitelinks search box hint).
+ * Page-specific schema (e.g. BlogPosting) is added on the relevant route.
+ */
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: siteConfig.name,
+  url: siteConfig.url,
+  description: siteConfig.description,
+  logo: absoluteUrl("/icon"),
+};
+
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: siteConfig.name,
+  url: siteConfig.url,
+  description: siteConfig.description,
 };
 
 export default function RootLayout({
@@ -34,6 +79,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <JsonLd data={organizationSchema} />
+        <JsonLd data={websiteSchema} />
+      </head>
       <body className="min-h-screen bg-white font-sans antialiased dark:bg-ink-950">
         <a
           href="#main"
