@@ -167,12 +167,24 @@ export class FileWaitlistStore implements WaitlistStore {
 let cachedStore: WaitlistStore | null = null;
 
 /**
+ * Default JSONL path. Vercel's serverless filesystem is read-only except for
+ * `/tmp`, so writing to the repo-relative `.data/` there fails with EROFS and
+ * every signup would 500. Default to `/tmp/waitlist.jsonl` on Vercel so the form
+ * works out of the box; the file is ephemeral (per-instance, cleared on cold
+ * start), so set `WAITLIST_WEBHOOK_URL` for durable capture. Override with
+ * `WAITLIST_DATA_FILE` when pointing at a managed store's path.
+ */
+function defaultWaitlistPath(): string {
+  return process.env.VERCEL ? "/tmp/waitlist.jsonl" : ".data/waitlist.jsonl";
+}
+
+/**
  * Process-wide singleton store. Uses the JSONL file store when a path is
- * configured (default `.data/waitlist.jsonl`), else an in-memory store.
+ * configured (default from `defaultWaitlistPath()`), else an in-memory store.
  */
 export function getWaitlistStore(): WaitlistStore {
   if (cachedStore) return cachedStore;
-  const filePath = process.env.WAITLIST_DATA_FILE ?? ".data/waitlist.jsonl";
+  const filePath = process.env.WAITLIST_DATA_FILE ?? defaultWaitlistPath();
   cachedStore = filePath ? new FileWaitlistStore(filePath) : new MemoryWaitlistStore();
   return cachedStore;
 }

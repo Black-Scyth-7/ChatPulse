@@ -6,7 +6,10 @@
  */
 export const siteConfig = {
   name: "ChatPulse",
-  url: "https://chatpulse.app",
+  // Canonical origin. Overridable via NEXT_PUBLIC_SITE_URL (inlined at build
+  // time) so preview/custom domains render correct absolute URLs without a code
+  // change; defaults to the production domain.
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://chatpulse.app",
   title: "ChatPulse — Secure real-time team chat",
   description:
     "Secure, real-time team chat for engineering teams. Channels, threads, and instant search — with end-to-end encryption on by default.",

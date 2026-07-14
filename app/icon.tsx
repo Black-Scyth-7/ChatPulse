@@ -1,7 +1,10 @@
 import { ImageResponse } from "next/og";
 
 // Generated app icon (favicon) — a brand-indigo rounded tile with the
-// ChatPulse "C" mark. Rendered at build/request time so we ship no binary asset.
+// ChatPulse "C" mark. Rendered on demand so we ship no binary asset.
+// Edge runtime: next/og embeds its fonts on the edge build, so ImageResponse
+// renders reliably on Vercel and in local `next start` (the Node runtime hits a
+// font-path resolution bug on Windows).
 export const runtime = "edge";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
