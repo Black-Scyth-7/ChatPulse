@@ -16,7 +16,11 @@ import {
 // --- validation ------------------------------------------------------------
 
 test("isValidEmail accepts well-formed addresses", () => {
-  for (const email of ["a@b.co", "user.name+tag@example.com", "x@sub.domain.io"]) {
+  for (const email of [
+    "a@b.co",
+    "user.name+tag@example.com",
+    "x@sub.domain.io",
+  ]) {
     assert.equal(isValidEmail(email), true, email);
   }
 });
@@ -54,7 +58,9 @@ test("submitToWaitlist rejects invalid email with 400", async () => {
 
 test("submitToWaitlist persists a valid signup and returns 200", async () => {
   const store = new MemoryWaitlistStore();
-  const res = await submitToWaitlist("New@Example.com", store, { source: "hero" });
+  const res = await submitToWaitlist("New@Example.com", store, {
+    source: "hero",
+  });
   assert.equal(res.ok, true);
   assert.equal(store.records.length, 1);
   const [record] = store.records;
@@ -70,13 +76,20 @@ test("submitToWaitlist dedupes case/whitespace-insensitively with 409", async ()
 
   const second = await submitToWaitlist("  DUPE@Example.com  ", store);
   assert.deepEqual(second, { ok: false, code: "already_joined", status: 409 });
-  assert.equal(store.records.length, 1, "duplicate must not be persisted twice");
+  assert.equal(
+    store.records.length,
+    1,
+    "duplicate must not be persisted twice",
+  );
 });
 
 test("submitToWaitlist maps store failures to 500", async () => {
   const failing: WaitlistStore = {
     has: async () => false,
     add: async () => {
+      throw new Error("disk on fire");
+    },
+    addIfAbsent: async () => {
       throw new Error("disk on fire");
     },
   };
@@ -119,9 +132,56 @@ test("FileWaitlistStore serializes concurrent signups without dropping data", as
   const results = await Promise.all(
     emails.map((email) => submitToWaitlist(email, store)),
   );
-  assert.ok(results.every((r) => r.ok), "all distinct concurrent signups succeed");
+  assert.ok(
+    results.every((r) => r.ok),
+    "all distinct concurrent signups succeed",
+  );
 
   const file = join(dir, "waitlist.jsonl");
   const lines = (await readFile(file, "utf8")).trim().split("\n");
   assert.equal(lines.length, 25, "no appends lost to interleaving");
+});
+
+// Regression: dedupe used to be `has()` then `add()` — two separately awaited
+// steps. Concurrent signups for one address all observed "absent" and all
+// inserted. The test above cannot catch it, because its 25 emails are
+// distinct; this one submits a single address many times at once.
+test("FileWaitlistStore stores the same email once under concurrency", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "waitlist-dup-"));
+  after(() => rm(dir, { recursive: true, force: true }));
+  const file = join(dir, "waitlist.jsonl");
+  const store = new FileWaitlistStore(file);
+
+  const results = await Promise.all(
+    Array.from({ length: 20 }, () =>
+      submitToWaitlist("dup@example.com", store),
+    ),
+  );
+
+  const accepted = results.filter((r) => r.ok);
+  const rejected = results.filter((r) => !r.ok && r.code === "already_joined");
+  assert.equal(accepted.length, 1, "exactly one concurrent signup wins");
+  assert.equal(rejected.length, 19, "the rest are told they already joined");
+
+  const lines = (await readFile(file, "utf8")).trim().split("\n");
+  assert.equal(lines.length, 1, "the address is written exactly once");
+});
+
+test("MemoryWaitlistStore stores the same email once under concurrency", async () => {
+  const store = new MemoryWaitlistStore();
+  const results = await Promise.all(
+    Array.from({ length: 20 }, () =>
+      submitToWaitlist("dup@example.com", store),
+    ),
+  );
+  assert.equal(results.filter((r) => r.ok).length, 1);
+  assert.equal(store.records.length, 1);
+});
+
+test("addIfAbsent reports whether it inserted", async () => {
+  const store = new MemoryWaitlistStore();
+  const record = { email: "a@b.co", createdAt: new Date().toISOString() };
+  assert.equal(await store.addIfAbsent(record), true, "first insert wins");
+  assert.equal(await store.addIfAbsent(record), false, "second is a duplicate");
+  assert.equal(store.records.length, 1);
 });

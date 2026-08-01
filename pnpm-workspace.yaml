@@ -1,2 +1,21 @@
+# pnpm 10+ reads overrides and build-script permissions from here rather than
+# from package.json. `packageManager` in package.json pins the version so local,
+# CI, and Vercel all resolve the same tree — pnpm 9 cannot read this file at all
+# (it demands a `packages:` field), so leaving the version unpinned meant the
+# install depended on whatever pnpm the environment happened to provide.
+
 onlyBuiltDependencies:
   - unrs-resolver
+
+# Transitive security bumps. Each is a package we do not depend on directly, so
+# the fix has to be forced from here:
+#   postcss          — arbitrary file read / path traversal via source maps
+#   brace-expansion  — DoS via unbounded expansion
+#   glob             — command injection in its CLI
+overrides:
+  postcss: ">=8.5.12"
+  # Pinned per major line. Forcing every consumer onto 2.x breaks minimatch@3,
+  # which requires ^1.1.7 — the 1.x branch has its own patched release.
+  brace-expansion@1: ">=1.1.17"
+  brace-expansion@2: ">=2.0.2"
+  glob: ">=10.5.0"

@@ -28,8 +28,19 @@ export interface WaitlistRecord {
 export interface WaitlistStore {
   /** True if this (already-normalized) email is present. */
   has(email: string): Promise<boolean>;
-  /** Persist a new record. Callers dedupe via `has` first. */
+  /** Persist a new record unconditionally. Prefer `addIfAbsent`. */
   add(record: WaitlistRecord): Promise<void>;
+  /**
+   * Insert only if the email is absent. Returns false when it was already
+   * there.
+   *
+   * This has to be one operation, not `has` followed by `add`. Those are two
+   * separately-awaited steps, so two concurrent signups for the same address
+   * can both observe "absent" and both insert — a check-then-act race that
+   * writes the address twice. An implementation must perform the test and the
+   * insert without yielding between them.
+   */
+  addIfAbsent(record: WaitlistRecord): Promise<boolean>;
 }
 
 export type WaitlistResult =
@@ -68,16 +79,16 @@ export async function submitToWaitlist(
   const email = normalizeEmail(rawEmail);
 
   try {
-    if (await store.has(email)) {
-      return { ok: false, code: "already_joined", status: 409 };
-    }
-
     const record: WaitlistRecord = {
       email,
       createdAt: new Date().toISOString(),
       ...(meta.source ? { source: meta.source } : {}),
     };
-    await store.add(record);
+
+    // One call, not `has` then `add`: see WaitlistStore.addIfAbsent.
+    if (!(await store.addIfAbsent(record))) {
+      return { ok: false, code: "already_joined", status: 409 };
+    }
     return { ok: true, record };
   } catch {
     // Persistence failed — surface a 500 so signups are never silently dropped.
@@ -100,6 +111,14 @@ export class MemoryWaitlistStore implements WaitlistStore {
   async add(record: WaitlistRecord): Promise<void> {
     this.emails.add(record.email);
     this.records.push(record);
+  }
+
+  async addIfAbsent(record: WaitlistRecord): Promise<boolean> {
+    // No await between the test and the insert, so nothing can interleave.
+    if (this.emails.has(record.email)) return false;
+    this.emails.add(record.email);
+    this.records.push(record);
+    return true;
   }
 }
 
@@ -156,11 +175,29 @@ export class FileWaitlistStore implements WaitlistStore {
 
   async add(record: WaitlistRecord): Promise<void> {
     return this.run(async () => {
-      const cache = await this.ensureLoaded();
-      await mkdir(dirname(this.filePath), { recursive: true });
-      await appendFile(this.filePath, JSON.stringify(record) + "\n", "utf8");
-      cache.add(record.email);
+      await this.write(record);
     });
+  }
+
+  async addIfAbsent(record: WaitlistRecord): Promise<boolean> {
+    // The whole test-and-insert runs as a single queued operation, so a
+    // concurrent signup for the same address waits behind it and then sees the
+    // cache already populated. Splitting this into `has` + `add` queues two
+    // operations and lets a second caller slip between them.
+    return this.run(async () => {
+      const cache = await this.ensureLoaded();
+      if (cache.has(record.email)) return false;
+      await this.write(record);
+      return true;
+    });
+  }
+
+  /** Append + cache. Callers must already hold the queue. */
+  private async write(record: WaitlistRecord): Promise<void> {
+    const cache = await this.ensureLoaded();
+    await mkdir(dirname(this.filePath), { recursive: true });
+    await appendFile(this.filePath, JSON.stringify(record) + "\n", "utf8");
+    cache.add(record.email);
   }
 }
 
@@ -185,24 +222,50 @@ function defaultWaitlistPath(): string {
 export function getWaitlistStore(): WaitlistStore {
   if (cachedStore) return cachedStore;
   const filePath = process.env.WAITLIST_DATA_FILE ?? defaultWaitlistPath();
-  cachedStore = filePath ? new FileWaitlistStore(filePath) : new MemoryWaitlistStore();
+  cachedStore = filePath
+    ? new FileWaitlistStore(filePath)
+    : new MemoryWaitlistStore();
   return cachedStore;
 }
 
+/** How long to wait on the integration webhook before giving up. */
+const WEBHOOK_TIMEOUT_MS = 3000;
+
 /**
  * Optional integration hook. If `WAITLIST_WEBHOOK_URL` is set, forward the
- * confirmed signup to it (Zapier/Make/CRM/ESP). Failures are logged but never
- * fail the request — the record is already persisted durably in the store.
+ * confirmed signup to it (Zapier/Make/CRM/ESP).
+ *
+ * The caller **awaits** this rather than firing and forgetting. On a serverless
+ * platform the instance may be frozen or reclaimed as soon as the response is
+ * returned, so work started but not awaited is not guaranteed to run — and
+ * since the default JSONL store lives on an ephemeral per-instance filesystem,
+ * this webhook is the durable record. Dropping it silently is the one failure
+ * that actually loses a signup.
+ *
+ * The cost is the request waiting on the webhook, bounded by
+ * `WEBHOOK_TIMEOUT_MS`. Failures are logged and never fail the signup: the
+ * address is already stored, and telling someone their signup failed when it
+ * did not is worse than a missing CRM row.
  */
 export async function notifyIntegration(record: WaitlistRecord): Promise<void> {
   const url = process.env.WAITLIST_WEBHOOK_URL;
   if (!url) return;
   try {
-    await fetch(url, {
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(record),
+      // Without this a hung endpoint holds the request open until the platform
+      // kills it.
+      signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
     });
+    if (!response.ok) {
+      // A 4xx/5xx does not throw, so it has to be checked explicitly or a
+      // rejected delivery looks identical to a successful one.
+      console.error(
+        `[waitlist] integration webhook returned ${response.status} for ${record.email}`,
+      );
+    }
   } catch (err) {
     console.error("[waitlist] integration webhook failed:", err);
   }

@@ -20,7 +20,9 @@ Built with **Next.js 14 (App Router)**, **TypeScript**, **Tailwind CSS**, and an
 ## Prerequisites
 
 - **Node.js** 18.18+ (Node 20+ recommended)
-- **pnpm** 8+ (`npm install -g pnpm`)
+- **pnpm** 10+ — the version is pinned via `packageManager` in
+  `package.json`; run `corepack enable` and pnpm will match it automatically.
+  (pnpm 9 cannot read this repo's `pnpm-workspace.yaml`.)
 
 ## Getting started
 

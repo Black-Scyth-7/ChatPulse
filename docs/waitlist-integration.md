@@ -10,13 +10,15 @@ Backs the landing waitlist form (`components/landing/WaitlistForm.tsx`) via
 
 Request body (JSON): `{ "email": string, "source"?: string }`
 
-| Status | Body                          | Meaning                                  |
-| ------ | ----------------------------- | ---------------------------------------- |
-| 200    | `{ "ok": true }`              | Joined (new signup persisted)            |
-| 400    | `{ "error": "invalid_body" }` | Body was not valid JSON                  |
-| 400    | `{ "error": "invalid_email" }`| Email missing/malformed/too long (>254)  |
-| 409    | `{ "error": "already_joined" }`| Email already on the list (deduped)     |
-| 500    | `{ "error": "storage_error" }`| Persistence failed — signup not dropped  |
+| Status | Body                            | Meaning                                  |
+| ------ | ------------------------------- | ---------------------------------------- |
+| 200    | `{ "ok": true }`                | Joined (new signup persisted)            |
+| 400    | `{ "error": "invalid_body" }`   | Body was not valid JSON                  |
+| 400    | `{ "error": "invalid_email" }`  | Email missing/malformed/too long (>254)  |
+| 409    | `{ "error": "already_joined" }` | Email already on the list (deduped)      |
+| 413    | `{ "error": "invalid_body" }`   | Body over 4 KB — rejected before parsing |
+| 429    | `{ "error": "rate_limited" }`   | Over 5/min for this client; see below    |
+| 500    | `{ "error": "storage_error" }`  | Persistence failed — signup not dropped  |
 
 The client form maps 409→"already on the list", 400→"enter a valid email",
 anything else→generic error. Emails are normalized (trim + lowercase) so
@@ -45,10 +47,45 @@ landing form fully functional in dev and single-instance/preview deploys.
 ## Optional integration: webhook forward
 
 If `WAITLIST_WEBHOOK_URL` is set, each confirmed signup is `POST`ed to it as
-JSON (`{ email, createdAt, source? }`) via `notifyIntegration`. This is
-fire-and-forget: the record is already persisted, so webhook failures are logged
-and never fail the user's request. Wire it to Zapier/Make, an ESP
-(ConvertKit/Mailchimp), or a CRM to sync signups without app changes.
+JSON (`{ email, createdAt, source? }`) via `notifyIntegration`. Wire it to
+Zapier/Make, an ESP (ConvertKit/Mailchimp), or a CRM to sync signups without
+app changes.
+
+The request **awaits** the webhook (with a 3-second timeout) rather than firing
+and forgetting it. On a serverless platform the instance can be frozen or
+reclaimed the moment the response is returned, so work started but not awaited
+is not guaranteed to run — and because the default store writes to an ephemeral
+per-instance filesystem, this webhook is the durable record. Losing it is the
+one failure that actually loses a signup.
+
+Failures — a network error, a timeout, or a non-2xx status — are logged and
+never fail the user's request: the address is already stored, and telling
+someone their signup failed when it did not is worse than a missing CRM row.
+
+## Rate limiting
+
+`POST /api/waitlist` allows 5 signups per minute per client, keyed on
+`x-forwarded-for`. Over the limit it answers `429` with `Retry-After`.
+
+The counters live in one process, so on a serverless platform each instance
+keeps its own and the effective ceiling is roughly `limit × instances`. That is
+a speed bump, not a quota — put a real limiter at the edge (Vercel WAF,
+Cloudflare) if the endpoint attracts sustained abuse. `x-forwarded-for` is also
+client-supplied and spoofable, so the key identifies a caller only as far as the
+proxy in front is trustworthy.
+
+## Deduplication
+
+`WaitlistStore.addIfAbsent` performs the "is it there / insert it" test as a
+single operation. It used to be `has()` followed by `add()` — two separately
+awaited steps, so two concurrent signups for the same address could both observe
+"absent" and both insert. Any replacement store must preserve that atomicity;
+with a database, a unique index on the email column is the natural way.
+
+Note that dedupe is still per-instance with the default file store: two
+serverless instances have separate files and separate caches, so the same
+address can be recorded once on each. A managed store (below) is what makes
+dedupe global.
 
 ## Migration path to a managed store
 
